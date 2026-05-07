@@ -24,7 +24,6 @@ use clap::Subcommand;
 use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use sha2::{Digest, Sha256};
 use sov_modules_api::Address;
 
 /// Default keystore root: `$XDG_DATA_HOME/ligate/keys` on Linux,
@@ -151,10 +150,19 @@ pub fn generate_role(role: &str, output_dir: &Path) -> Result<GeneratedKey> {
     let signing_key = SigningKey::from_bytes(&secret_bytes);
     let pubkey_bytes = signing_key.verifying_key().to_bytes();
 
-    // Address derivation: SHA-256(pubkey)[..28].
-    let digest = Sha256::digest(pubkey_bytes);
+    // Address derivation: first 28 bytes of the public key.
+    //
+    // The chain authenticates a transaction by computing
+    // `credential_id = HexString(pubkey_bytes)` (per
+    // `MockZkvmCryptoSpec::PublicKey::credential_id`), then
+    // `Address::from(credential_id) = pubkey[..28]` (per
+    // `sov_modules_api::common::address::From<HexString<[u8;32]>>`).
+    // We must match that derivation; using `SHA-256(pubkey)[..28]`
+    // produces a different address that won't match what the chain
+    // derives at signature-verification time, leading to "balance not
+    // found" / `CannotReserveGas` errors.
     let mut addr_bytes = [0u8; 28];
-    addr_bytes.copy_from_slice(&digest[..28]);
+    addr_bytes.copy_from_slice(&pubkey_bytes[..28]);
     let address = Address::from(addr_bytes);
     let address_str = address.to_string();
 
