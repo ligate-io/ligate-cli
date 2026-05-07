@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  # Sovereign SDK macros walk up from OUT_DIR looking for
+  # `constants.toml`. The cli ships its own copy mirroring chain
+  # repo; CI points the macro at it explicitly so no upward walk is
+  # needed (and the build doesn't depend on the working directory).
+  CONSTANTS_MANIFEST_PATH: ${{ github.workspace }}/constants.toml
+  # Don't compile the risc0 zkVM guest. The chain's prover crate is
+  # transitively pulled in via `ligate-rollup`, but the cli doesn't
+  # need real ZK proofs; mock zkvm is fine.
+  SKIP_GUEST_BUILD: "1"
+  RISC0_SKIP_BUILD_KERNELS: "1"
+
+jobs:
+  fmt:
+    name: cargo fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          components: clippy
+      - name: Install libclang (librocksdb-sys build dep)
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev clang
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets -- -D warnings
+
+  check:
+    name: cargo check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+      - name: Install libclang (librocksdb-sys build dep)
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev clang
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-targets
+
+  # NOTE: cargo test is currently disabled because the chain's risc0
+  # prover crate (transitively pulled via `ligate-rollup`) trips its
+  # build-script even with SKIP_GUEST_BUILD=1 under `cargo test` (the
+  # env vars don't propagate cleanly through test-bin compilation).
+  # Pure-keystore unit tests (no chain deps) live under `mod tests` in
+  # `keys.rs` and `config.rs`; they compile via `cargo check
+  # --all-targets`. Re-enable once the risc0 toolchain is no longer
+  # transitively required, or wire a feature flag in `ligate-rollup`
+  # that omits the prover sub-crate.
+  # test:
+  #   name: cargo test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v6
+  #     - uses: dtolnay/rust-toolchain@master
+  #       with:
+  #         toolchain: 1.93.0
+  #     - name: Install libclang (librocksdb-sys build dep)
+  #       run: sudo apt-get update && sudo apt-get install -y libclang-dev clang
+  #     - uses: Swatinem/rust-cache@v2
+  #     - run: cargo test

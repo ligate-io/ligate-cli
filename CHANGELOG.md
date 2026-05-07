@@ -1,0 +1,41 @@
+# Changelog
+
+All notable changes to `ligate-cli`. Pre-launch; everything sits
+under `[Unreleased]` until the first tagged release alongside
+`ligate-devnet-1` going live.
+
+Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
+
+## [Unreleased]
+
+### Initial scaffold
+
+- `ligate keys generate | list | show` for local Ed25519 keystore
+  management. On-disk format byte-compatible with the chain's
+  `ligate-genesis-tool keys generate`.
+- `ligate balance` for read-only `$LGT` balance queries against a
+  running node.
+- `ligate transfer` for `bank.transfer` build-sign-submit using
+  `ligate-client::submit::Submitter`.
+- `ligate faucet` for one-shot drips against a deployed faucet
+  service.
+- Shared chain-identity flag plumbing (`--chain-id`, `--chain-hash`,
+  `--token-id`) with env-var fallbacks (`LIGATE_CHAIN_ID`,
+  `LIGATE_CHAIN_HASH`, `LIGATE_LGT_TOKEN_ID`).
+- `--rpc URL` and `--json` global flags.
+- CI: fmt + clippy + check on Ubuntu, libclang installed for
+  librocksdb-sys, `SKIP_GUEST_BUILD=1` + `RISC0_SKIP_BUILD_KERNELS=1`
+  + `CONSTANTS_MANIFEST_PATH` to keep the chain's risc0 prover dep
+  from blocking the build.
+- `cargo test` CI job is intentionally commented out pending risc0
+  toolchain cleanup in `ligate-rollup`.
+- Tracking: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112).
+
+### Out of scope for v0
+
+Subcommands deferred until their chain-side modules ship:
+
+- `ligate attest submit | verify` (Themisra attestation module)
+- `ligate schema register | show` (schema registry module)
+- `ligate attestor-set register | show` (attestor-set module)
+- `ligate node start` (operator wrapper around `cargo run --bin ligate-node`)

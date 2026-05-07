@@ -1,0 +1,15 @@
+# Rust
+/target
+**/*.rs.bk
+*.pdb
+
+# Local config / keystore (never commit a real key)
+.env
+*.key
+*.address
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store

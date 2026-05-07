@@ -1,0 +1,75 @@
+[package]
+name = "ligate-cli"
+version = "0.0.1"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Operator + builder CLI for Ligate Chain. One-line wrapper around the typed client SDK."
+repository = "https://github.com/ligate-io/ligate-cli"
+homepage = "https://ligate.io"
+authors = ["Ligate Labs <hello@ligate.io>"]
+rust-version = "1.93"
+publish = false
+
+[[bin]]
+name = "ligate"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4", features = ["derive", "env", "wrap_help"] }
+clap_complete = "4"
+
+# Async runtime (NodeClient + Submitter need it for queries + submission)
+tokio = { version = "1", features = ["full"] }
+
+# JSON + structured output
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Hex + bech32 (key file IO and address parsing)
+hex = "0.4"
+
+# Borsh for transaction encoding
+borsh = { version = "1", features = ["derive"] }
+
+# Crypto for `keys generate` (lifted from chain genesis-tool)
+ed25519-dalek = "2"
+rand = "0.8"
+sha2 = "0.10"
+
+# HTTP client for the `faucet claim` subcommand
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# Local config + keystore
+toml = "0.8"
+directories = "5"
+
+# Chain-side crates (git deps until upstream SDK lands on crates.io,
+# tracked in chain repo #235). All pinned to the same chain-repo
+# branch so they stay version-coherent across faucet + cli + ts-sdk.
+ligate-client = { git = "https://github.com/ligate-io/ligate-chain.git", branch = "main", features = ["submit"] }
+ligate-stf    = { git = "https://github.com/ligate-io/ligate-chain.git", branch = "main", features = ["native"] }
+ligate-rollup = { git = "https://github.com/ligate-io/ligate-chain.git", branch = "main" }
+
+# Sovereign SDK pieces we directly construct.
+sov-bank        = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f89964c66bcfb6a31712e43278378b54c33d3779", features = ["native"] }
+sov-modules-api = { git = "https://github.com/Sovereign-Labs/sovereign-sdk.git", rev = "f89964c66bcfb6a31712e43278378b54c33d3779", features = ["native"] }
+
+[dev-dependencies]
+tempfile = "3"
+assert_cmd = "2"
+predicates = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
