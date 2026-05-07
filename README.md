@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml) [![License: Apache-2.0 OR MIT](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license) [![Chain](https://img.shields.io/badge/chain-ligate--devnet--1-A7D28C.svg)](https://github.com/ligate-io/ligate-chain) [![Docs](https://img.shields.io/badge/docs-docs.ligate.io-A7D28C.svg)](https://docs.ligate.io) [![Pre-devnet](https://img.shields.io/badge/status-pre--devnet-E8833A.svg)](#status)
 
-Operator + builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-chain). One-line wrapper around the typed client SDK: generate keys, query balances, transfer `$LGT`, drip from the faucet.
+Operator and builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-chain). One-line wrapper around the typed client SDK: generate keys, query balances, transfer `$LGT`, drip from the faucet.
 
 ## Quick start
 
