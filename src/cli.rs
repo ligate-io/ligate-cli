@@ -8,6 +8,7 @@ use clap::{Args, Parser, Subcommand};
 
 use crate::balance::BalanceCmd;
 use crate::faucet::FaucetCmd;
+use crate::info::InfoCmd;
 use crate::keys::KeysCmd;
 use crate::transfer::TransferCmd;
 
@@ -134,6 +135,10 @@ mod tests {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Print chain identity (chain_id, chain_hash, node version) for
+    /// the configured RPC.
+    Info(InfoCmd),
+
     /// Manage local Ed25519 keypairs.
     #[command(subcommand)]
     Keys(KeysCmd),

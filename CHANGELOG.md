@@ -10,6 +10,7 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `ligate info` subcommand. One-line operator check after a deploy: prints `chain_id`, `chain_hash`, and node `version` for the configured RPC. Pure HTTP GET against `/v1/rollup/info`; no signing, no keystore touched. Supports `--json` for pipelining (`export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)`). Useful first command in the post-`ligate-node-up` smoke test from `docs/development/public-devnet-deploy.md`. Closes the gap where operators had to `curl https://rpc.ligate.io/v1/rollup/info | jq` instead of having a first-party flag.
 - `.github/workflows/release.yml` — tagged-release workflow that
   cross-compiles `ligate` for the four target platforms operators
   and developers run on (linux x86_64 / arm64, darwin arm64 / amd64),

@@ -7,6 +7,7 @@ mod balance;
 mod cli;
 mod config;
 mod faucet;
+mod info;
 mod keys;
 mod keystore;
 mod transfer;
@@ -33,6 +34,7 @@ async fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let result = match cli.command {
+        Command::Info(cmd) => cmd.run(&cli.global).await,
         Command::Keys(cmd) => cmd.run().await,
         Command::Balance(cmd) => cmd.run(&cli.global).await,
         Command::Transfer(cmd) => cmd.run(&cli.global).await,
