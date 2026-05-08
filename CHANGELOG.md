@@ -8,6 +8,21 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+
+- `.github/workflows/release.yml` — tagged-release workflow that
+  cross-compiles `ligate` for the four target platforms operators
+  and developers run on (linux x86_64 / arm64, darwin arm64 / amd64),
+  packages each as a `.tar.gz` with SHA-256 checksum, and attaches
+  them to a GitHub Release with the `## [Unreleased]` section of this
+  CHANGELOG as release notes. Triggered on `v*` tag pushes;
+  `workflow_dispatch` runs the build matrix as a dry-run without
+  publishing. Mirrors `ligate-chain` and `ligate-io/faucet` release
+  workflows exactly so binaries across the three repos share an
+  install pattern (`wget` of the tarball; `cargo install --git` as
+  fallback). Drops the "compile Rust on the laptop / VM for ~20
+  minutes" step from the operator + builder install flow.
+
 ### Initial scaffold
 
 - `ligate keys generate | list | show` for local Ed25519 keystore
