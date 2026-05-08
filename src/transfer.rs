@@ -17,7 +17,7 @@ use ligate_rollup::MockRollupSpec;
 use ligate_stf::runtime::RuntimeCall;
 use serde::Serialize;
 use sov_bank::{Amount, CallMessage as BankCall, Coins};
-use sov_modules_api::capabilities::{TransactionAuthenticator, UniquenessData};
+use sov_modules_api::capabilities::UniquenessData;
 use sov_modules_api::execution_mode::Native;
 use sov_modules_api::transaction::{PriorityFeeBips, UnsignedTransaction};
 use sov_modules_api::{CryptoSpec, PrivateKey, Spec};
@@ -166,12 +166,15 @@ impl TransferCmd {
             None,
         );
         let signed = unsigned.sign(&private_key, &chain_hash);
-        let inner_bytes = borsh::to_vec(&signed).context("encoding signed tx")?;
-        let raw_tx = sov_modules_api::RawTx { data: inner_bytes };
-        let baked =
-            <ChainRuntime as sov_modules_api::Runtime<S>>::Auth::encode_with_standard_auth(raw_tx);
+        // Borsh-encode the signed `Transaction`. The chain's
+        // `POST /v1/sequencer/txs` handler accepts the inner signed tx
+        // bytes directly and wraps them in `AuthenticatorInput::Standard`
+        // server-side (see `sov-sequencer::rest_api::axum_accept_tx`).
+        // Pre-wrapping here would double-wrap and the chain would
+        // reject with "Cannot decompress Edwards point" (chain #245).
+        let signed_bytes = borsh::to_vec(&signed).context("encoding signed tx")?;
         let tx_hash = submitter
-            .submit_raw_tx(baked.data.to_vec(), true)
+            .submit_raw_tx(signed_bytes, true)
             .await
             .with_context(|| format!("submitting transfer {} -> {}", from_addr, self.to))?;
 
