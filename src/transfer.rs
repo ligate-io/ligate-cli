@@ -9,6 +9,7 @@
 
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use clap::Args;
@@ -174,8 +175,13 @@ impl TransferCmd {
         // Pre-wrapping here would double-wrap and the chain would
         // reject with "Cannot decompress Edwards point" (chain #245).
         let signed_bytes = borsh::to_vec(&signed).context("encoding signed tx")?;
+        // Pass `wait_for_inclusion = false`. The SDK's true path uses
+        // a WebSocket subscription (`subscribe_to_tx_status_updates`)
+        // that hits a URL-parsing bug in our setup (`invalid port
+        // value`, see issue #8). We do an HTTP poll on
+        // `/v1/ledger/txs/{hash}` instead — same UX, no WebSocket.
         let tx_hash = submitter
-            .submit_raw_tx(signed_bytes, true)
+            .submit_raw_tx(signed_bytes, false)
             .await
             .with_context(|| format!("submitting transfer {} -> {}", from_addr, self.to))?;
 
@@ -183,6 +189,10 @@ impl TransferCmd {
         // (so `.to_string()` works) but not `Display` (so `{tx_hash}`
         // wouldn't). Convert once to a String and format that.
         let tx_hash_str = tx_hash.to_string();
+
+        // Poll for inclusion. Returns once the chain has indexed the
+        // tx (success or failure both count) or times out.
+        wait_for_inclusion_via_http(&submitter, &rpc, &tx_hash_str).await?;
         let amount_lgt = (amount_nano as f64) / 1_000_000_000.0;
 
         if global.json {
@@ -202,5 +212,48 @@ impl TransferCmd {
             println!("  tx:     {tx_hash_str}");
         }
         Ok(())
+    }
+}
+
+/// Poll the chain via HTTP `GET /ledger/txs/{tx_hash}` until the
+/// transaction has been indexed. Returns once we see a 2xx response.
+///
+/// Replaces the SDK's `wait_for_tx_processing`, which subscribes via
+/// WebSocket and trips a URL-parse bug (`invalid port value`) when
+/// constructing the `ws://` upgrade URL from a non-standard
+/// `http://host:port` base. The chain itself accepts the tx fine in
+/// either case; this is purely a client-side confirmation lookup, so
+/// HTTP polling is functionally equivalent and avoids the SDK's WS
+/// path entirely.
+///
+/// `rpc_with_v1` is the URL produced by [`GlobalArgs::rpc_with_v1`]
+/// (already ends in `/v1`).
+///
+/// Times out after 30s. Polls every 500ms with bounded backoff.
+async fn wait_for_inclusion_via_http(
+    submitter: &Submitter,
+    rpc_with_v1: &str,
+    tx_hash: &str,
+) -> Result<()> {
+    const POLL_INTERVAL: Duration = Duration::from_millis(500);
+    const MAX_WAIT: Duration = Duration::from_secs(30);
+
+    let url = format!("{rpc_with_v1}/ledger/txs/{tx_hash}");
+    let started = Instant::now();
+    loop {
+        if started.elapsed() > MAX_WAIT {
+            anyhow::bail!(
+                "timed out after {:?} waiting for tx {tx_hash} to be included; \
+                 the tx may still land — check `{url}` to verify",
+                MAX_WAIT
+            );
+        }
+        // The SDK's `http_get` returns Err on non-2xx (including the
+        // 404 the chain returns for not-yet-indexed txs). Treat any
+        // error as "keep polling".
+        if submitter.inner().http_get(&url).await.is_ok() {
+            return Ok(());
+        }
+        tokio::time::sleep(POLL_INTERVAL).await;
     }
 }
