@@ -1,0 +1,244 @@
+name: Release
+
+# Triggered on `v*` tag pushes. Cross-compiles `ligate` for the
+# four target platforms operators and developers run on (linux x86_64,
+# linux arm64, darwin arm64, darwin amd64), packages each as a tarball
+# with a SHA-256 checksum, and attaches them to a GitHub Release with
+# the `## [Unreleased]` section of `CHANGELOG.md` as release notes.
+#
+# Drops the "compile Rust on the laptop / VM for ~20 minutes" step
+# from the operator + builder install flow. Once the workflow has
+# produced a tagged release, `cargo install --git` (which compiles
+# from source) becomes the fallback path; `wget` of the tarball is
+# the canonical install.
+#
+# Mirrors `ligate-chain/.github/workflows/release.yml` and
+# `ligate-io/faucet/.github/workflows/release.yml` exactly. The only
+# differences are the binary name (`ligate` vs `ligate-node` /
+# `ligate-faucet`) and the archive prefix.
+#
+# Tagging convention:
+#   - Pre-devnet:  `v0.0.X-rc.N` per release candidate.
+#   - At devnet:   `v0.0.1-devnet` and pin alongside the chain.
+#   - Mainnet:     `v1.0.0` and forward.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Allow a maintainer to dry-run the build path without tagging.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  # Same risc0-skip rationale as ci.yml: the cli pulls the chain's
+  # rollup crate transitively (for `RuntimeCall` types and the
+  # `RollupAuthenticator`), which pulls risc0. We don't run real
+  # proving from the cli; mock zkvm is fine. The host binary builds
+  # cleanly without invoking the guest.
+  SKIP_GUEST_BUILD: "1"
+  RISC0_SKIP_BUILD_KERNELS: "1"
+  # Sovereign SDK macros walk up from OUT_DIR looking for
+  # `constants.toml`. The cli ships its own copy mirroring chain
+  # repo; the macros need the path explicit so the build doesn't
+  # depend on the working directory.
+  CONSTANTS_MANIFEST_PATH: ${{ github.workspace }}/constants.toml
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runner: ubuntu-24.04
+            archive_suffix: linux-amd64
+          - target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm
+            archive_suffix: linux-arm64
+          - target: aarch64-apple-darwin
+            runner: macos-14
+            archive_suffix: darwin-arm64
+          # Intel Mac for contributors on 2018-2019 hardware. `macos-13`
+          # is the last GitHub-hosted Intel runner; `macos-14`+ are
+          # Apple Silicon only.
+          - target: x86_64-apple-darwin
+            runner: macos-13
+            archive_suffix: darwin-amd64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Need full history for the changelog excerpt step.
+          fetch-depth: 0
+
+      - name: Compute version
+        id: version
+        shell: bash
+        run: |
+          # Tag push: use the tag (e.g. v0.0.1) stripped of leading 'v'.
+          # workflow_dispatch: use the short SHA so dry-runs produce
+          # uniquely-named artifacts.
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="dryrun-${{ github.sha }}"
+            VERSION="${VERSION:0:18}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Linux runners need libclang-dev for `clang-sys` (pulled
+      # transitively via risc0 build deps). Same as ci.yml.
+      - name: Install libclang (Linux only)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev clang
+
+      # macOS runners ship Xcode + CLI tools, but `libclang.dylib`
+      # lives inside the active developer toolchain rather than on
+      # the default dyld search path. `librocksdb-sys` and `clang-sys`
+      # both load `libclang.dylib` at build-script runtime; without
+      # `LIBCLANG_PATH` / `DYLD_FALLBACK_LIBRARY_PATH` set, dyld can't
+      # find it and the build aborts with SIGABRT.
+      - name: Set LIBCLANG_PATH (macOS only)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eu
+          LIBCLANG_DIR="$(dirname $(dirname $(xcrun --find clang)))/lib"
+          ls -la "${LIBCLANG_DIR}/libclang.dylib"
+          echo "LIBCLANG_PATH=${LIBCLANG_DIR}" >> "$GITHUB_ENV"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=${LIBCLANG_DIR}" >> "$GITHUB_ENV"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-
+
+      - name: Build ligate (release)
+        shell: bash
+        run: |
+          cargo build --release --bin ligate --target "${{ matrix.target }}"
+
+      - name: Strip + package
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.version.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          SUFFIX="${{ matrix.archive_suffix }}"
+          BIN_DIR="target/${TARGET}/release"
+          ARCHIVE_DIR="ligate-cli-${VERSION}-${SUFFIX}"
+          mkdir -p "${ARCHIVE_DIR}"
+          cp "${BIN_DIR}/ligate" "${ARCHIVE_DIR}/"
+
+          # Strip symbols where the platform supports it.
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            strip "${ARCHIVE_DIR}/ligate" || true
+          elif [[ "${RUNNER_OS}" == "macOS" ]]; then
+            strip "${ARCHIVE_DIR}/ligate" || true
+          fi
+
+          # Include LICENSE-* so the tarball is self-describing.
+          cp LICENSE-APACHE LICENSE-MIT "${ARCHIVE_DIR}/" || true
+
+          ARCHIVE="${ARCHIVE_DIR}.tar.gz"
+          tar -czf "${ARCHIVE}" "${ARCHIVE_DIR}"
+
+          # SHA-256 portable across the runners.
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          else
+            shasum -a 256 "${ARCHIVE}" > "${ARCHIVE}.sha256"
+          fi
+
+          echo "archive=${ARCHIVE}" >> "$GITHUB_OUTPUT"
+          echo "checksum=${ARCHIVE}.sha256" >> "$GITHUB_OUTPUT"
+          ls -lh "${ARCHIVE}" "${ARCHIVE}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ligate-cli-${{ matrix.archive_suffix }}
+          path: |
+            ligate-cli-*-${{ matrix.archive_suffix }}.tar.gz
+            ligate-cli-*-${{ matrix.archive_suffix }}.tar.gz.sha256
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    # Only publish on a real tag push. workflow_dispatch builds run
+    # the matrix above (smoke test) but skip the publish step.
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout (for CHANGELOG access)
+        uses: actions/checkout@v5
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Stage artifacts for release
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          # Each matrix job uploads under `ligate-cli-${archive_suffix}/`.
+          # Flatten into one directory the release tool can glob.
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.sha256' \) -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Extract changelog excerpt
+        id: changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Read the section between `## [Unreleased]` and the next
+          # `## ` heading. That's the bucket of entries this release
+          # represents.
+          awk '
+            /^## \[Unreleased\]/ {capture=1; next}
+            /^## / {if (capture) {capture=0}}
+            capture==1 {print}
+          ' CHANGELOG.md > release-notes.md
+
+          # If empty, fall back to a one-liner.
+          if ! [[ -s release-notes.md ]]; then
+            echo "_(No changelog entries; see commit history.)_" > release-notes.md
+          fi
+
+          echo "Release notes preview:"
+          head -40 release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          files: release/*
+          # Treat tags ending in `-rc.N` / `-devnet` / `-testnet` as
+          # pre-release; full mainnet uses `vX.Y.Z` plain.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          fail_on_unmatched_files: true
