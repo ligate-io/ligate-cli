@@ -146,9 +146,10 @@ impl TransferCmd {
         // Connect + fetch nonce. Unlike the faucet (which keeps an
         // in-memory atomic counter), the CLI is one-shot per
         // invocation, so we re-fetch every time.
-        let submitter = Submitter::new(&global.rpc)
+        let rpc = global.rpc_with_v1();
+        let submitter = Submitter::new(&rpc)
             .await
-            .with_context(|| format!("connecting to {}", global.rpc))?;
+            .with_context(|| format!("connecting to {rpc}"))?;
         let nonce = submitter
             .inner()
             .get_nonce_for_public_key::<S>(&private_key.pub_key())

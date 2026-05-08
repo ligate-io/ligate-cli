@@ -42,9 +42,10 @@ struct BalanceJson<'a> {
 impl BalanceCmd {
     pub async fn run(self, global: &GlobalArgs) -> Result<()> {
         let token_id: TokenId = parse_token_id(&self.token_id)?;
-        let submitter = Submitter::new(&global.rpc)
+        let rpc = global.rpc_with_v1();
+        let submitter = Submitter::new(&rpc)
             .await
-            .with_context(|| format!("connecting to {}", global.rpc))?;
+            .with_context(|| format!("connecting to {rpc}"))?;
 
         let amount = submitter
             .inner()
