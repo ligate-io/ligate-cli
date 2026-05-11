@@ -128,24 +128,11 @@ fn parse_32_byte_id(s: &str, expected_hrp: &str) -> Result<[u8; 32]> {
     Ok(arr)
 }
 
-/// Bech32m-encode a 32-byte chain hash as `lsch1...`.
-///
-/// Mirrors the chain's `LschHash::Display` impl. Reserved for the
-/// future case where a subcommand wants to re-emit a chain hash it
-/// took in via `--chain-hash` (which accepts hex too) back through
-/// the canonical bech32m form. `info` doesn't need it because the
-/// chain's JSON already comes back `lsch1...` since
-/// `ligate-chain@0ac7e5b`; kept here as the API-parity counterpart
-/// to [`encode_token_id`] so future commands have a single place to
-/// reach for.
-#[allow(dead_code)]
-pub fn encode_chain_hash(bytes: &[u8; 32]) -> String {
-    encode_32_byte_id(bytes, CHAIN_HASH_HRP)
-}
-
 /// Bech32m-encode a [`TokenId`] as `token_1...`.
 ///
 /// Mirrors the chain's `TokenIdBech32::Display` impl from sov-bank.
+/// Used by `ligate balance --json` so the emitted `token_id` round-trips
+/// straight back through `--token-id` without manual conversion.
 pub fn encode_token_id(token_id: &TokenId) -> String {
     encode_32_byte_id(token_id.as_bytes(), TOKEN_ID_HRP)
 }
@@ -186,7 +173,7 @@ mod tests {
     #[test]
     fn chain_hash_bech32m_roundtrip() {
         let bytes = fixture_bytes();
-        let s = encode_chain_hash(&bytes);
+        let s = encode_32_byte_id(&bytes, CHAIN_HASH_HRP);
         assert!(s.starts_with("lsch1"), "got {s}");
         let decoded = parse_chain_hash(&s).unwrap();
         assert_eq!(decoded, bytes);
@@ -222,12 +209,6 @@ mod tests {
         assert!(s.starts_with("token_1"), "got {s}");
         let id = parse_token_id(&s).unwrap();
         assert_eq!(id.as_bytes(), &bytes);
-    }
-
-    #[test]
-    fn encode_chain_hash_starts_with_lsch1() {
-        let s = encode_chain_hash(&ZERO_BYTES);
-        assert!(s.starts_with("lsch1"), "got {s}");
     }
 
     #[test]
