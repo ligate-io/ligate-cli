@@ -130,9 +130,15 @@ fn parse_32_byte_id(s: &str, expected_hrp: &str) -> Result<[u8; 32]> {
 
 /// Bech32m-encode a 32-byte chain hash as `lsch1...`.
 ///
-/// Mirrors the chain's `LschHash::Display` impl. Useful for the
-/// `info --json` output and for log lines that want canonical form
-/// regardless of how the operator passed the value in.
+/// Mirrors the chain's `LschHash::Display` impl. Reserved for the
+/// future case where a subcommand wants to re-emit a chain hash it
+/// took in via `--chain-hash` (which accepts hex too) back through
+/// the canonical bech32m form. `info` doesn't need it because the
+/// chain's JSON already comes back `lsch1...` since
+/// `ligate-chain@0ac7e5b`; kept here as the API-parity counterpart
+/// to [`encode_token_id`] so future commands have a single place to
+/// reach for.
+#[allow(dead_code)]
 pub fn encode_chain_hash(bytes: &[u8; 32]) -> String {
     encode_32_byte_id(bytes, CHAIN_HASH_HRP)
 }
