@@ -70,13 +70,17 @@ pub struct TransferCmd {
     #[arg(long, env = "LIGATE_CHAIN_ID")]
     pub chain_id: u64,
 
-    /// 32-byte chain hash (64-char hex). Pull from a running node's
-    /// `/v1/rollup/info`.
+    /// 32-byte chain hash. Accepts bech32m `lsch1...` (canonical since
+    /// `ligate-chain@0ac7e5b`), `0x`-prefixed hex, or bare 64-char
+    /// hex. Pull from a running node's `/v1/rollup/info`, or directly
+    /// from `ligate info --json | jq -r .chain_hash`.
     #[arg(long, env = "LIGATE_CHAIN_HASH")]
     pub chain_hash: String,
 
-    /// `$LGT` token id (64-char hex). Pull from `bank.json`'s
-    /// `token_id` at genesis.
+    /// `$LGT` token id. Accepts bech32m `token_1...` (canonical since
+    /// `ligate-chain@0ac7e5b`), `0x`-prefixed hex, or bare 64-char
+    /// hex. Pull from `bank.json`'s `token_id` at genesis, the
+    /// explorer, or `ligate balance --json`.
     #[arg(long, env = "LIGATE_LGT_TOKEN_ID")]
     pub token_id: String,
 

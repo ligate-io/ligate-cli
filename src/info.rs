@@ -8,6 +8,12 @@
 //! ```sh
 //! export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)
 //! ```
+//!
+//! Since `ligate-chain@0ac7e5b` the `chain_hash` field comes back as a
+//! bech32m `lsch1...` string (older chain revs emitted bare hex). The
+//! string is passed verbatim into `ligate transfer --chain-hash` /
+//! `LIGATE_CHAIN_HASH`; [`crate::config::parse_chain_hash`] accepts both
+//! forms, so the env-var pipeline keeps working across the bump.
 
 use anyhow::{Context, Result};
 use clap::Args;
