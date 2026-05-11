@@ -13,7 +13,7 @@ use sov_bank::TokenId;
 use sov_modules_api::execution_mode::Native;
 
 use crate::cli::GlobalArgs;
-use crate::config::parse_token_id;
+use crate::config::{encode_token_id, parse_token_id};
 
 /// Spec carries the address shape; for read queries the DA flavour
 /// doesn't matter (mirrors transfer.rs).
@@ -24,9 +24,12 @@ pub struct BalanceCmd {
     /// `lig1...` address to query.
     pub address: String,
 
-    /// Token id (64-char hex). Defaults to `$LGT` once that's a
-    /// well-known constant; for now the operator passes it explicitly.
-    /// Pull from `bank.json`'s `token_id` at chain genesis.
+    /// Token id. Accepts bech32m `token_1...` (canonical since
+    /// `ligate-chain@0ac7e5b`), `0x`-prefixed hex, or bare 64-char
+    /// hex. Pull from the explorer, from `bank.json`'s `token_id` at
+    /// chain genesis, or from any `ligate balance` JSON output. Defaults
+    /// to `$LGT` once that's a well-known constant; for now the
+    /// operator passes it explicitly.
     #[arg(long, env = "LIGATE_LGT_TOKEN_ID")]
     pub token_id: String,
 }
@@ -58,9 +61,14 @@ impl BalanceCmd {
         let lgt = (nano as f64) / 1_000_000_000.0;
 
         if global.json {
+            // Emit `token_1...` rather than raw hex so the value
+            // round-trips through `--token-id` without manual
+            // conversion. Hex is still accepted on input by
+            // `parse_token_id`; the canonical output form matches
+            // what the explorer + chain emit elsewhere.
             let payload = BalanceJson {
                 address: &self.address,
-                token_id: hex::encode(token_id.as_bytes()),
+                token_id: encode_token_id(&token_id),
                 amount_nano: nano,
                 amount_lgt: lgt,
             };
