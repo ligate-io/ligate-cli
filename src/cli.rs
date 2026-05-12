@@ -7,6 +7,7 @@
 use clap::{Args, Parser, Subcommand};
 
 use crate::balance::BalanceCmd;
+use crate::completions::CompletionsCmd;
 use crate::faucet::FaucetCmd;
 use crate::info::InfoCmd;
 use crate::keys::KeysCmd;
@@ -151,4 +152,10 @@ pub enum Command {
 
     /// Claim a one-shot drip from the devnet faucet.
     Faucet(FaucetCmd),
+
+    /// Generate a shell completion script for the chosen shell.
+    ///
+    /// Pipe to the install path for your shell — install snippets are
+    /// in the module docstring (`src/completions.rs`).
+    Completions(CompletionsCmd),
 }
