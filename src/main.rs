@@ -5,6 +5,7 @@
 
 mod balance;
 mod cli;
+mod completions;
 mod config;
 mod faucet;
 mod info;
@@ -39,6 +40,7 @@ async fn main() -> ExitCode {
         Command::Balance(cmd) => cmd.run(&cli.global).await,
         Command::Transfer(cmd) => cmd.run(&cli.global).await,
         Command::Faucet(cmd) => cmd.run(&cli.global).await,
+        Command::Completions(cmd) => cmd.run().await,
     };
 
     match result {

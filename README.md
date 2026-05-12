@@ -45,6 +45,26 @@ ligate transfer \
 
 All chain-identity flags also accept env vars (`LIGATE_RPC`, `LIGATE_CHAIN_ID`, `LIGATE_CHAIN_HASH`, `LIGATE_LGT_TOKEN_ID`). Set them once in your shell and the flags become optional.
 
+### Shell completions
+
+`ligate completions <SHELL>` prints a completion script to stdout. Pipe to the install path for your shell:
+
+```bash
+# zsh (user-level)
+ligate completions zsh > ~/.local/share/zsh/site-functions/_ligate
+
+# bash (system-wide)
+ligate completions bash | sudo tee /etc/bash_completion.d/ligate
+
+# fish (user-level)
+ligate completions fish > ~/.config/fish/completions/ligate.fish
+
+# powershell — append to your $PROFILE
+ligate completions powershell >> $PROFILE
+```
+
+Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their sub-subcommands; flags tab-complete too.
+
 ## Status
 
 **Pre-devnet.** `ligate-devnet-1` is targeted for **Q2 2026**. Tracking issue: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112).
