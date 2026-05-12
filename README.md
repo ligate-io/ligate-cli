@@ -8,15 +8,46 @@ Operator and builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-
 
 ### Install
 
-```bash
-# Required first install (Ubuntu/Debian)
-sudo apt install -y libclang-dev clang
-# macOS:  xcode-select --install
+Two paths, in preference order.
 
-cargo install --git https://github.com/ligate-io/ligate-cli
+#### 1. Pre-built tarball (recommended)
+
+Each tagged release (`v*` tag) attaches platform tarballs for **linux-x86_64**, **linux-arm64**, **darwin-arm64**, **darwin-amd64**, each with a SHA-256 sidecar. Pick the one for your host:
+
+```bash
+# Replace VERSION with the release tag (e.g. v0.0.1-devnet) and
+# PLATFORM with one of: linux-amd64, linux-arm64, darwin-arm64,
+# darwin-amd64.
+curl -L -o ligate.tar.gz \
+  https://github.com/ligate-io/ligate-cli/releases/download/VERSION/ligate-VERSION-PLATFORM.tar.gz
+tar -xzf ligate.tar.gz
+sudo mv ligate /usr/local/bin/
+ligate --help
 ```
 
-Once mature, will publish to crates.io.
+No Rust toolchain needed. ~30s end-to-end on a normal connection.
+
+#### 2. Build from source via `cargo install`
+
+Fallback when a tagged tarball isn't published for your platform, or you want to track `main` ahead of a release.
+
+```bash
+# Linux: system libclang is required for the chain's transitive
+# librocksdb-sys build script (bindgen needs libclang.dylib).
+sudo apt install -y libclang-dev clang
+
+# macOS: xcode-select --install (the bundled clang is enough)
+
+# Expect 10–15 min cold-cache, ~5 min warm. Pulls ~3 GiB of git
+# deps (chain runtime + SDK fork). Subsequent builds reuse the
+# Cargo cache.
+SKIP_GUEST_BUILD=1 RISC0_SKIP_BUILD_KERNELS=1 \
+  cargo install --git https://github.com/ligate-io/ligate-cli
+```
+
+The two env vars skip the risc0 zkVM guest compile — the CLI doesn't run real proving (mock zkvm is fine for client-side use). Without them, you'd also need the `risc0` toolchain (`rzup install`).
+
+`crates.io` publish is blocked until the Sovereign SDK lands there (chain pin is a git dep today). Tracked in [ligate-chain#235](https://github.com/ligate-io/ligate-chain/issues/235).
 
 ### Use
 
