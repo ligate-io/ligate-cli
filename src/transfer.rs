@@ -58,8 +58,9 @@ pub struct TransferCmd {
     pub amount_nano: Option<u128>,
 
     /// Local keystore role (created by `ligate keys generate`).
+    /// One of `--signer` or `--private-key-hex` is required.
     #[arg(long)]
-    pub signer: String,
+    pub signer: Option<String>,
 
     /// Override the keystore directory.
     #[arg(long)]
@@ -88,6 +89,32 @@ pub struct TransferCmd {
     /// (= 0.1 $LGT).
     #[arg(long)]
     pub max_fee: Option<u128>,
+
+    /// Build + sign the transfer locally, print the hex-encoded signed
+    /// tx bytes to stdout, and exit. Skips the RPC roundtrip entirely
+    /// (no nonce fetch, no submit, no inclusion wait).
+    ///
+    /// Used by the byte-level parity test against `@ligate-labs/sdk`
+    /// (ligate-js#18): same inputs through both signers should produce
+    /// byte-identical signed-tx bytes. Mismatches indicate wire-format
+    /// drift between the Rust + TS impls.
+    ///
+    /// Requires `--nonce` (can't fetch from chain in offline mode) and
+    /// either `--signer` reading from the keystore OR `--private-key-hex`
+    /// passing the seed inline.
+    #[arg(long, requires = "nonce")]
+    pub print_tx_bytes: bool,
+
+    /// Account nonce. Required with `--print-tx-bytes`; otherwise the
+    /// CLI fetches it from chain.
+    #[arg(long)]
+    pub nonce: Option<u64>,
+
+    /// 32-byte private key seed as hex (with or without `0x` prefix).
+    /// Alternative to `--signer` for offline / parity-test flows that
+    /// don't want to set up a keystore. Conflicts with `--signer`.
+    #[arg(long, conflicts_with = "signer")]
+    pub private_key_hex: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -121,17 +148,45 @@ impl TransferCmd {
         let chain_hash = parse_chain_hash(&self.chain_hash)?;
         let token_id = parse_token_id(&self.token_id)?;
 
-        // Resolve signer key + sender address from keystore.
-        let key_hex = resolve_signer_key(&self.signer, self.keystore.as_deref())
-            .with_context(|| format!("loading key for role '{}'", self.signer))?;
-        let from_addr = read_address(
-            &self.keystore.clone().unwrap_or_else(|| {
-                directories::ProjectDirs::from("io", "ligate", "cli")
-                    .map(|d| d.data_dir().join("keys"))
-                    .unwrap_or_default()
-            }),
-            &self.signer,
-        )?;
+        // Resolve signer key. Two paths:
+        //
+        // 1. `--signer <role>` reads from the keystore (production path)
+        // 2. `--private-key-hex 0x..` takes the seed inline (parity-test
+        //    + offline scripting path)
+        //
+        // Exactly one is required; clap enforces conflict.
+        let (key_hex, from_addr_opt) = match (&self.signer, &self.private_key_hex) {
+            (Some(_), Some(_)) => {
+                anyhow::bail!("pass --signer or --private-key-hex, not both");
+            }
+            (Some(signer), None) => {
+                let key = resolve_signer_key(signer, self.keystore.as_deref())
+                    .with_context(|| format!("loading key for role '{}'", signer))?;
+                let addr = read_address(
+                    &self.keystore.clone().unwrap_or_else(|| {
+                        directories::ProjectDirs::from("io", "ligate", "cli")
+                            .map(|d| d.data_dir().join("keys"))
+                            .unwrap_or_default()
+                    }),
+                    signer,
+                )?;
+                (key, Some(addr))
+            }
+            (None, Some(hex_seed)) => {
+                let cleaned = hex_seed
+                    .strip_prefix("0x")
+                    .or_else(|| hex_seed.strip_prefix("0X"))
+                    .unwrap_or(hex_seed);
+                // `--private-key-hex` is the offline / parity-test
+                // path; sender address derives from the key but we
+                // don't need it for the signed-bytes output, so leave
+                // the keystore-read out of band.
+                (cleaned.to_string(), None)
+            }
+            (None, None) => {
+                anyhow::bail!("must pass --signer or --private-key-hex");
+            }
+        };
 
         let key_bytes = hex::decode(&key_hex).context("hex-decoding signer key")?;
         let private_key =
@@ -148,21 +203,56 @@ impl TransferCmd {
             },
         });
 
-        // Connect + fetch nonce. Unlike the faucet (which keeps an
-        // in-memory atomic counter), the CLI is one-shot per
-        // invocation, so we re-fetch every time.
+        // Resolve nonce. Two paths matching the signer flag:
+        //
+        // - `--nonce N` (required by `--print-tx-bytes`): use the
+        //   supplied value. Offline mode, no RPC.
+        // - default: fetch from chain via `Submitter::get_nonce_for_public_key`.
+        let max_fee = self.max_fee.unwrap_or(DEFAULT_MAX_FEE_NANO);
+
+        if self.print_tx_bytes {
+            // Offline build + sign + print path. `--nonce` is required
+            // by clap; unwrap is safe (clap enforces `requires =
+            // "nonce"` on the --print-tx-bytes flag).
+            let nonce = self
+                .nonce
+                .ok_or_else(|| anyhow::anyhow!("--print-tx-bytes requires --nonce"))?;
+            let unsigned = UnsignedTransaction::<ChainRuntime, S>::new(
+                runtime_call,
+                self.chain_id,
+                PriorityFeeBips::ZERO,
+                Amount::from(max_fee),
+                UniquenessData::Nonce(nonce),
+                None,
+            );
+            let signed = unsigned.sign(&private_key, &chain_hash);
+            let signed_bytes = borsh::to_vec(&signed).context("encoding signed tx")?;
+            // Hex (no prefix) is the canonical interchange form for the
+            // ligate-js parity test. lowercase, no newline before the
+            // final one (println adds it).
+            println!("{}", hex::encode(&signed_bytes));
+            return Ok(());
+        }
+
+        // Online path: connect + fetch nonce. Unlike the faucet
+        // (which keeps an in-memory atomic counter), the CLI is
+        // one-shot per invocation, so we re-fetch every time.
+        let from_addr =
+            from_addr_opt.expect("online path requires --signer (keystore-derived address)");
         let rpc = global.rpc_with_v1();
         let submitter = Submitter::new(&rpc)
             .await
             .with_context(|| format!("connecting to {rpc}"))?;
-        let nonce = submitter
-            .inner()
-            .get_nonce_for_public_key::<S>(&private_key.pub_key())
-            .await
-            .with_context(|| format!("fetching nonce for {from_addr}"))?;
+        let nonce = match self.nonce {
+            Some(n) => n,
+            None => submitter
+                .inner()
+                .get_nonce_for_public_key::<S>(&private_key.pub_key())
+                .await
+                .with_context(|| format!("fetching nonce for {from_addr}"))?,
+        };
 
         // Wrap, sign, encode, submit.
-        let max_fee = self.max_fee.unwrap_or(DEFAULT_MAX_FEE_NANO);
         let unsigned = UnsignedTransaction::<ChainRuntime, S>::new(
             runtime_call,
             self.chain_id,
