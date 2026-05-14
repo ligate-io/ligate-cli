@@ -3,6 +3,7 @@
 //! Subcommand dispatch lives in [`cli`]. This file is just argument
 //! parsing, tracing setup, and the top-level error formatter.
 
+mod attest;
 mod balance;
 mod cli;
 mod completions;
@@ -11,6 +12,10 @@ mod faucet;
 mod info;
 mod keys;
 mod keystore;
+mod query;
+mod register_attestor_set;
+mod register_schema;
+mod submit_attestation;
 mod transfer;
 
 use std::process::ExitCode;
@@ -41,6 +46,10 @@ async fn main() -> ExitCode {
         Command::Transfer(cmd) => cmd.run(&cli.global).await,
         Command::Faucet(cmd) => cmd.run(&cli.global).await,
         Command::Completions(cmd) => cmd.run().await,
+        Command::RegisterAttestorSet(cmd) => cmd.run(&cli.global).await,
+        Command::RegisterSchema(cmd) => cmd.run(&cli.global).await,
+        Command::SubmitAttestation(cmd) => cmd.run(&cli.global).await,
+        Command::Query(cmd) => cmd.run(&cli.global).await,
     };
 
     match result {

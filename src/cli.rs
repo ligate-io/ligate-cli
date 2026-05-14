@@ -11,6 +11,10 @@ use crate::completions::CompletionsCmd;
 use crate::faucet::FaucetCmd;
 use crate::info::InfoCmd;
 use crate::keys::KeysCmd;
+use crate::query::QueryCmd;
+use crate::register_attestor_set::RegisterAttestorSetCmd;
+use crate::register_schema::RegisterSchemaCmd;
+use crate::submit_attestation::SubmitAttestationCmd;
 use crate::transfer::TransferCmd;
 
 /// Operator + builder CLI for Ligate Chain.
@@ -152,6 +156,22 @@ pub enum Command {
 
     /// Claim a one-shot drip from the devnet faucet.
     Faucet(FaucetCmd),
+
+    /// Register an attestor set: a quorum of attestor public keys plus
+    /// an M-of-N threshold. Returns the `las1...` id.
+    RegisterAttestorSet(RegisterAttestorSetCmd),
+
+    /// Register an attestation schema from a JSON definition file.
+    /// Returns the `lsc1...` id.
+    RegisterSchema(RegisterSchemaCmd),
+
+    /// Submit a threshold-signed attestation under an existing schema.
+    SubmitAttestation(SubmitAttestationCmd),
+
+    /// Read a registered schema, attestor set, or attestation back by
+    /// id (read-only; no signing).
+    #[command(subcommand)]
+    Query(QueryCmd),
 
     /// Generate a shell completion script for the chosen shell.
     ///
