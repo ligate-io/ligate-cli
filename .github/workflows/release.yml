@@ -64,12 +64,14 @@ jobs:
           - target: aarch64-apple-darwin
             runner: macos-14
             archive_suffix: darwin-arm64
-          # Intel Mac for contributors on 2018-2019 hardware. `macos-13`
-          # is the last GitHub-hosted Intel runner; `macos-14`+ are
-          # Apple Silicon only.
-          - target: x86_64-apple-darwin
-            runner: macos-13
-            archive_suffix: darwin-amd64
+          # Intel Mac (`x86_64-apple-darwin` on `macos-13`) was removed
+          # 2026-05-15 in lockstep with the chain repo. GitHub's hosted
+          # Intel pool has 1-4h queue waits during EU/US business
+          # hours, which blocked v0.1.0-devnet because `release:` needs
+          # the full matrix. Modern Mac users are overwhelmingly Apple
+          # Silicon. 2018-2019 Intel Mac contributors fall back to
+          # `cargo install --git`. Re-add if GitHub stabilises the
+          # Intel pool or a self-hosted runner is wired up.
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -238,7 +240,10 @@ jobs:
           name: ${{ github.ref_name }}
           body_path: release-notes.md
           files: release/*
-          # Treat tags ending in `-rc.N` / `-devnet` / `-testnet` as
-          # pre-release; full mainnet uses `vX.Y.Z` plain.
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          # Treat ONLY tags containing `-rc.` as pre-release (true
+          # release candidates). `-devnet` / `-testnet` tags are
+          # "current public network" releases -- pinned, canonical for
+          # that network's lifetime -- and ship as normal releases.
+          # Full mainnet uses `vX.Y.Z` plain.
+          prerelease: ${{ contains(github.ref_name, '-rc.') }}
           fail_on_unmatched_files: true
