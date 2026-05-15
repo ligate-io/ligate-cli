@@ -3958,7 +3958,7 @@ dependencies = [
 
 [[package]]
 name = "ligate-cli"
-version = "0.0.1"
+version = "0.1.0-devnet"
 dependencies = [
  "anyhow",
  "assert_cmd",
