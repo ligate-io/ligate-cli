@@ -24,9 +24,9 @@ use sov_modules_api::transaction::{PriorityFeeBips, UnsignedTransaction};
 use sov_modules_api::{CryptoSpec, PrivateKey, Spec};
 
 use crate::cli::GlobalArgs;
-use crate::nonce::fetch_account_nonce;
 use crate::config::{parse_chain_hash, parse_token_id};
 use crate::keystore::{read_address, resolve_signer_key};
+use crate::nonce::fetch_account_nonce;
 
 /// Concrete spec mirrors the faucet's choice. `MockRollupSpec<Native>`
 /// shares the chain's address shape and runtime composition; the DA

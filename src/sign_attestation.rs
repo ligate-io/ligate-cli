@@ -133,11 +133,12 @@ impl SignAttestationCmd {
             (None, None) => {
                 anyhow::bail!("must pass --payload-hash or --payload-file")
             }
-            (Some(s), None) => PayloadHash::from_str(s)
-                .with_context(|| format!("parsing --payload-hash '{s}'"))?,
+            (Some(s), None) => {
+                PayloadHash::from_str(s).with_context(|| format!("parsing --payload-hash '{s}'"))?
+            }
             (None, Some(p)) => {
-                let bytes = fs::read(p)
-                    .with_context(|| format!("reading payload file {}", p.display()))?;
+                let bytes =
+                    fs::read(p).with_context(|| format!("reading payload file {}", p.display()))?;
                 let digest: [u8; 32] = Sha256::digest(&bytes).into();
                 PayloadHash::from(digest)
             }
@@ -160,10 +161,8 @@ impl SignAttestationCmd {
             (Some(_), Some(_)) => {
                 anyhow::bail!("pass --signer or --private-key-hex, not both");
             }
-            (Some(role), None) => {
-                resolve_signer_key(role, self.signer.keystore.as_deref())
-                    .with_context(|| format!("loading key for role '{role}'"))?
-            }
+            (Some(role), None) => resolve_signer_key(role, self.signer.keystore.as_deref())
+                .with_context(|| format!("loading key for role '{role}'"))?,
             (None, Some(hex_seed)) => hex_seed
                 .strip_prefix("0x")
                 .or_else(|| hex_seed.strip_prefix("0X"))
