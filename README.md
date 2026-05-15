@@ -1,6 +1,6 @@
 # ligate-cli
 
-[![CI](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml) [![License: Apache-2.0 OR MIT](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license) [![Chain](https://img.shields.io/badge/chain-ligate--devnet--1-A7D28C.svg)](https://github.com/ligate-io/ligate-chain) [![Docs](https://img.shields.io/badge/docs-docs.ligate.io-A7D28C.svg)](https://docs.ligate.io) [![Pre-devnet](https://img.shields.io/badge/status-pre--devnet-E8833A.svg)](#status)
+[![CI](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml) [![License: Apache-2.0 OR MIT](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license) [![Chain](https://img.shields.io/badge/chain-ligate--devnet--1-A7D28C.svg)](https://github.com/ligate-io/ligate-chain) [![Docs](https://img.shields.io/badge/docs-docs.ligate.io-A7D28C.svg)](https://docs.ligate.io) [![Devnet](https://img.shields.io/badge/status-devnet-A7D28C.svg)](#status)
 
 Operator and builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-chain). One-line wrapper around the typed client SDK: generate keys, query balances, transfer `$LGT`, drip from the faucet, register schemas / attestor sets, submit attestations.
 
@@ -98,11 +98,11 @@ Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their s
 
 ## Status
 
-**Pre-devnet.** `ligate-devnet-1` is targeted for **Q2 2026**. Tracking issue: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112).
+**Devnet.** `ligate-devnet-1` is live.
 
 v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `sign-attestation`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. Only `ligate node start` (operator wrapper around `cargo run --bin ligate-node`) is still deferred.
 
-First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`. The `Pre-devnet` badge above flips once a 24–48h public soak on Mocha completes; tracking issue [`ligate-cli#21`](https://github.com/ligate-io/ligate-cli/issues/21).
+First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`.
 
 ## Commands
 
