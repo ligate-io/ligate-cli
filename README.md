@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/ligate-io/ligate-cli/actions/workflows/ci.yml) [![License: Apache-2.0 OR MIT](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license) [![Chain](https://img.shields.io/badge/chain-ligate--devnet--1-A7D28C.svg)](https://github.com/ligate-io/ligate-chain) [![Docs](https://img.shields.io/badge/docs-docs.ligate.io-A7D28C.svg)](https://docs.ligate.io) [![Pre-devnet](https://img.shields.io/badge/status-pre--devnet-E8833A.svg)](#status)
 
-Operator and builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-chain). One-line wrapper around the typed client SDK: generate keys, query balances, transfer `$LGT`, drip from the faucet.
+Operator and builder CLI for [Ligate Chain](https://github.com/ligate-io/ligate-chain). One-line wrapper around the typed client SDK: generate keys, query balances, transfer `$LGT`, drip from the faucet, register schemas / attestor sets, submit attestations.
 
 ## Quick start
 
@@ -15,7 +15,7 @@ Two paths, in preference order.
 Each tagged release (`v*` tag) attaches platform tarballs for **linux-x86_64**, **linux-arm64**, **darwin-arm64**, **darwin-amd64**, each with a SHA-256 sidecar. Pick the one for your host:
 
 ```bash
-# Replace VERSION with the release tag (e.g. v0.0.1-devnet) and
+# Replace VERSION with the release tag (e.g. v0.1.0-devnet) and
 # PLATFORM with one of: linux-amd64, linux-arm64, darwin-arm64,
 # darwin-amd64.
 curl -L -o ligate.tar.gz \
@@ -100,9 +100,22 @@ Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their s
 
 **Pre-devnet.** `ligate-devnet-1` is targeted for **Q2 2026**. Tracking issue: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112).
 
-v0 surface (`keys`, `balance`, `transfer`, `faucet`) is wired and CI-green. Remaining v0 surface (`attest`, `schema`, `attestor-set`, `node`) is gated on the chain-side modules they consume.
+v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. Only `ligate node start` (operator wrapper around `cargo run --bin ligate-node`) is still deferred.
+
+First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`. The `Pre-devnet` badge above flips once a 24–48h public soak on Mocha completes; tracking issue [`ligate-cli#21`](https://github.com/ligate-io/ligate-cli/issues/21).
 
 ## Commands
+
+### `ligate info`
+
+One-line chain-identity check for the configured RPC. Prints `chain_id`, `chain_hash`, and the node `version` reported by `/v1/rollup/info`. No signing, no keystore touched.
+
+```
+ligate info
+ligate info --json   # for piping into jq
+```
+
+Useful first command in the post-`ligate-node-up` smoke test from [`docs/development/public-devnet-deploy.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/development/public-devnet-deploy.md). Exports cleanly via `export LIGATE_CHAIN_HASH=$(ligate info --json | jq -r .chain_hash)`.
 
 ### `ligate keys`
 
@@ -147,6 +160,58 @@ Claim a drip from a deployed faucet service.
 ```
 ligate faucet lig1xyz...
 ligate faucet lig1xyz... --faucet-url https://faucet.ligate.io
+```
+
+### `ligate register-attestor-set`
+
+Register a quorum of attestor public keys plus an M-of-N threshold. The on-chain id is derived deterministically from the sorted member list, so submitting the same set twice is a no-op.
+
+```
+ligate register-attestor-set \
+    --members lpk1...,lpk1...,lpk1...    \  # comma-separated, order-independent
+    --threshold 2                        \  # 1..=members.len()
+    --signer <role>                      \
+    --chain-id <u64> --chain-hash <64-hex>
+```
+
+Returns the bech32m `las1...` set id on stdout (use `--json` for structured output).
+
+### `ligate register-schema`
+
+Register an attestation schema from a JSON definition file. The schema name + version + attestor-set id collectively make up the on-chain key; bumping `version` is how a schema rotates to a new attestor set.
+
+```
+ligate register-schema \
+    --file ./themisra-proof-of-prompt-v1.json   \
+    --signer <role>                             \
+    --chain-id <u64> --chain-hash <64-hex>
+```
+
+Schema JSON shape (`name`, `version`, `attestor_set_id`, plus optional `fee_routing_bps` / `fee_routing_address` / `payload_spec_hash`) is documented in the module docstring at [`src/register_schema.rs`](src/register_schema.rs). Returns the `lsc1...` schema id.
+
+### `ligate submit-attestation`
+
+Submit a threshold-signed attestation under an existing schema. Signatures are collected off-chain (one per attestor) and passed in as a JSON file.
+
+```
+ligate submit-attestation \
+    --schema lsc1...                          \  # registered schema id
+    --payload-hash lph1...                    \  # bech32m hash of the off-chain payload
+    --signatures ./sigs.json                  \  # array of { pubkey: lpk1..., sig: hex }
+    --signer <role>                           \
+    --chain-id <u64> --chain-hash <64-hex>
+```
+
+The chain verifies signature count meets the schema's attestor-set threshold and that every signature is from a member of that set.
+
+### `ligate query`
+
+Read-only fetch by id; no signing or keystore touch. Mirrors the three `/v1/...` REST routes the chain exposes.
+
+```
+ligate query schema lsc1...                   # registered schema
+ligate query attestor-set las1...             # registered attestor set
+ligate query attestation lsc1...:lph1...      # attestation (compound id)
 ```
 
 ## Global flags
