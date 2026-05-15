@@ -12,9 +12,11 @@ mod faucet;
 mod info;
 mod keys;
 mod keystore;
+mod nonce;
 mod query;
 mod register_attestor_set;
 mod register_schema;
+mod sign_attestation;
 mod submit_attestation;
 mod transfer;
 
@@ -48,6 +50,7 @@ async fn main() -> ExitCode {
         Command::Completions(cmd) => cmd.run().await,
         Command::RegisterAttestorSet(cmd) => cmd.run(&cli.global).await,
         Command::RegisterSchema(cmd) => cmd.run(&cli.global).await,
+        Command::SignAttestation(cmd) => cmd.run(&cli.global).await,
         Command::SubmitAttestation(cmd) => cmd.run(&cli.global).await,
         Command::Query(cmd) => cmd.run(&cli.global).await,
     };

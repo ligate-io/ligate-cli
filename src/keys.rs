@@ -55,7 +55,9 @@ pub enum KeysCmd {
         keystore: Option<PathBuf>,
     },
 
-    /// Show the address for one role.
+    /// Show the address for one role. With `--pubkey`, prints the
+    /// bech32m `lpk1...` public key instead (for
+    /// `register-attestor-set --members`).
     Show {
         /// Role label.
         name: String,
@@ -63,6 +65,17 @@ pub enum KeysCmd {
         /// Keystore directory. Defaults to the OS keystore dir.
         #[arg(long)]
         keystore: Option<PathBuf>,
+
+        /// Print the bech32m `lpk1...` public key instead of the
+        /// `lig1...` address.
+        ///
+        /// Needed for `register-attestor-set --members`, which takes
+        /// the 32-byte ed25519 public key encoded as bech32m with HRP
+        /// `lpk`. Without this flag, `show` prints the 28-byte
+        /// `lig1...` account address (used everywhere else: balance
+        /// lookups, transfer destinations, fee-routing).
+        #[arg(long)]
+        pubkey: bool,
     },
 }
 
@@ -77,6 +90,12 @@ impl KeysCmd {
                 let g = generate_role(&name, &dir)?;
                 println!("Generated key for role '{}':", g.role);
                 println!("  address: {}", g.address);
+                // Surface the pubkey too, since the typical next step
+                // for an attestor role is to feed it to
+                // `register-attestor-set --members`. Cheaper than
+                // making the operator follow up with `keys show
+                // <role> --pubkey`.
+                println!("  pubkey:  {}", g.pubkey);
                 println!("  key:     {}", g.key_path.display());
                 println!("  (mode 0600, do not commit)");
                 Ok(())
@@ -102,14 +121,26 @@ impl KeysCmd {
                 }
                 Ok(())
             }
-            Self::Show { name, keystore } => {
+            Self::Show {
+                name,
+                keystore,
+                pubkey,
+            } => {
                 let dir = match keystore {
                     Some(p) => p,
                     None => default_keystore_dir()?,
                 };
-                let addr = read_address(&dir, &name)
-                    .with_context(|| format!("no key for role '{name}' in {}", dir.display()))?;
-                println!("{addr}");
+                if pubkey {
+                    let lpk = derive_pubkey_bech32(&dir, &name).with_context(|| {
+                        format!("deriving pubkey for role '{name}' in {}", dir.display())
+                    })?;
+                    println!("{lpk}");
+                } else {
+                    let addr = read_address(&dir, &name).with_context(|| {
+                        format!("no key for role '{name}' in {}", dir.display())
+                    })?;
+                    println!("{addr}");
+                }
                 Ok(())
             }
         }
@@ -127,6 +158,11 @@ impl KeysCmd {
 pub struct GeneratedKey {
     pub role: String,
     pub address: String,
+    /// Bech32m `lpk1...` form of the 32-byte ed25519 public key.
+    /// Surfaced so `keys generate` can echo it alongside the address;
+    /// the typical follow-up for an attestor role is to feed it to
+    /// `register-attestor-set --members`.
+    pub pubkey: String,
     pub key_path: PathBuf,
     pub address_path: PathBuf,
 }
@@ -189,9 +225,12 @@ pub fn generate_role(role: &str, output_dir: &Path) -> Result<GeneratedKey> {
     fs::write(&address_path, format!("{address_str}\n"))
         .with_context(|| format!("writing {}", address_path.display()))?;
 
+    let pubkey_str = ligate_client::PubKey::from(pubkey_bytes).to_string();
+
     Ok(GeneratedKey {
         role: role.to_string(),
         address: address_str,
+        pubkey: pubkey_str,
         key_path,
         address_path,
     })
@@ -212,6 +251,31 @@ fn list_roles(keystore: &Path) -> Result<Vec<String>> {
         }
     }
     Ok(roles)
+}
+
+/// Derive the bech32m `lpk1...` public key for a keystore role.
+///
+/// Reads the 32-byte ed25519 seed from `<role>.key`, derives the
+/// public key via `ed25519_dalek::SigningKey`, and wraps it in
+/// `ligate_client::PubKey` so its `Display` produces the canonical
+/// bech32m form. This is the form `register-attestor-set --members`
+/// expects.
+///
+/// Kept separate from `read_address` (which reads the precomputed
+/// `<role>.address` file) because the pubkey is not persisted
+/// alongside the key file. We could write a `<role>.pubkey` at
+/// generation time, but the derivation is cheap and avoids a
+/// keystore-format migration for existing operators.
+pub fn derive_pubkey_bech32(keystore: &Path, role: &str) -> Result<String> {
+    let key_hex = read_key_hex(keystore, role)?;
+    let key_bytes = hex::decode(&key_hex).context("hex-decoding key seed")?;
+    let seed: [u8; 32] = key_bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("key seed must be 32 bytes, got {}", key_bytes.len()))?;
+    let signing_key = ed25519_dalek::SigningKey::from_bytes(&seed);
+    let pubkey_bytes = signing_key.verifying_key().to_bytes();
+    Ok(ligate_client::PubKey::from(pubkey_bytes).to_string())
 }
 
 /// Read `<role>.address` from the keystore.
