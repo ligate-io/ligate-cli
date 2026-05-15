@@ -212,21 +212,31 @@ async fn wait_for_inclusion_via_http(
     const POLL_INTERVAL: Duration = Duration::from_millis(500);
     const MAX_WAIT: Duration = Duration::from_secs(30);
 
-    let url = format!("{rpc_with_v1}/ledger/txs/{tx_hash}");
+    // `NodeClient::http_get` prepends its own `base_url`, so we pass
+    // the PATH `/ledger/txs/<hash>`, not the full URL. The earlier
+    // version (`format!("{rpc_with_v1}/ledger/txs/{tx_hash}")`)
+    // produced a doubled URL the chain returned 404 for with an empty
+    // body -- and `http_get` returns `Ok("")` on 404 because it
+    // doesn't check status. The `.is_ok()` check then exited the
+    // loop on the first poll, falsely reporting the tx as included.
+    // See `info.rs` for the same root cause + fix.
+    let full_url = format!("{rpc_with_v1}/ledger/txs/{tx_hash}"); // error msg only
+    let path = format!("/ledger/txs/{tx_hash}");
     let started = Instant::now();
     loop {
         if started.elapsed() > MAX_WAIT {
             anyhow::bail!(
                 "timed out after {:?} waiting for tx {tx_hash} to be included; \
-                 the tx may still land. Check `{url}` to verify",
+                 the tx may still land. Check `{full_url}` to verify",
                 MAX_WAIT
             );
         }
-        // The SDK's `http_get` returns Err on non-2xx (including the
-        // 404 the chain returns for not-yet-indexed txs). Treat any
-        // error as "keep polling".
-        if submitter.inner().http_get(&url).await.is_ok() {
-            return Ok(());
+        // `http_get` returns `Ok("")` on 404 (SDK doesn't check
+        // status). Empty body == tx not yet indexed == keep polling.
+        // A populated body == chain returning the indexed tx JSON.
+        match submitter.inner().http_get(&path).await {
+            Ok(body) if !body.trim().is_empty() => return Ok(()),
+            _ => {}
         }
         tokio::time::sleep(POLL_INTERVAL).await;
     }
