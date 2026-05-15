@@ -29,7 +29,6 @@ use sov_modules_api::{Amount, CryptoSpec, PrivateKey, PublicKey, Spec};
 use crate::cli::GlobalArgs;
 use crate::config::parse_chain_hash;
 use crate::keystore::resolve_signer_key;
-use crate::nonce::fetch_account_nonce;
 
 /// Concrete spec, identical to `transfer.rs` and the chain's
 /// `bootstrap-cli`. `MockRollupSpec<Native>` shares the chain's
@@ -98,13 +97,10 @@ pub struct ChainArgs {
 
     /// Override the account nonce instead of fetching from chain.
     ///
-    /// Escape hatch for the SDK fork's broken `get_nonce_for_public_key`
-    /// (queries `/modules/nonces/...` against a chain that exposes the
-    /// renamed `/modules/uniqueness/...` path; the 404 silently maps to
-    /// 0). The local `fetch_account_nonce` helper below routes around
-    /// that, so users normally do not need this flag; keep it for
-    /// emergency overrides and offline build-sign-print flows that
-    /// might land here later.
+    /// Escape hatch for offline build-sign-print flows or for
+    /// emergency manual override when an account's on-chain nonce
+    /// state is suspected wedged. Most callers should leave this
+    /// unset and let the cli fetch the current nonce automatically.
     #[arg(long)]
     pub nonce: Option<u64>,
 }
@@ -176,13 +172,15 @@ pub async fn build_sign_submit(
 
     // One-shot per invocation, so re-fetch the nonce every time (the
     // chain is the source of truth; no in-memory counter to drift).
-    //
-    // `--nonce N` overrides the chain fetch. Used as an escape hatch
-    // for the SDK fork bug below + for future offline build-sign-print
-    // flows.
+    // `--nonce N` overrides the chain fetch for offline build-sign
+    // flows and emergency manual overrides.
     let nonce = match chain.nonce {
         Some(n) => n,
-        None => fetch_account_nonce::<S>(&submitter, &private_key.pub_key()).await?,
+        None => submitter
+            .inner()
+            .get_nonce_for_public_key::<S>(&private_key.pub_key())
+            .await
+            .context("fetching nonce for signer")?,
     };
 
     let unsigned = UnsignedTransaction::<ChainRuntime, S>::new(
