@@ -39,7 +39,9 @@ struct RollupInfo {
 impl InfoCmd {
     pub async fn run(self, global: &GlobalArgs) -> Result<()> {
         let rpc = global.rpc_with_v1();
-        let url = format!("{rpc}/rollup/info");
+        // For error messages only -- the actual fetch passes a path to
+        // `http_get` (see below).
+        let full_url = format!("{rpc}/rollup/info");
 
         // Use the SDK's NodeClient (via `Submitter`) for the GET so the
         // URL-shaping + transport behaviour stays consistent with
@@ -47,14 +49,26 @@ impl InfoCmd {
         // schema probe (we WANT to ask `info` even if the chain just
         // booted and isn't fully ready), so the existing `Submitter::new`
         // path isn't right here.
+        //
+        // IMPORTANT: `NodeClient::http_get` prepends its own `base_url`
+        // (set from the `&rpc` passed to `Submitter::new_unchecked`).
+        // So we pass the PATH `/rollup/info`, not the full URL. Passing
+        // the full URL produces a doubled string like
+        // `https://rpc.../v1https://rpc.../v1/rollup/info`, which
+        // `reqwest` issues against the host portion it can parse out
+        // (`rpc.ligate.io`); the chain then returns 404 with an empty
+        // body, and `http_get` happily returns `Ok("")` because it
+        // doesn't check the status code. See SDK
+        // `crates/utils/sov-node-client/src/lib.rs::http_get`.
         let submitter = Submitter::new_unchecked(&rpc);
         let body = submitter
             .inner()
-            .http_get(&url)
+            .http_get("/rollup/info")
             .await
-            .with_context(|| format!("GET {url}"))?;
-        let info: RollupInfo = serde_json::from_str(&body)
-            .with_context(|| format!("parsing /rollup/info JSON: {body}"))?;
+            .with_context(|| format!("GET {full_url}"))?;
+        let info: RollupInfo = serde_json::from_str(&body).with_context(|| {
+            format!("parsing /rollup/info JSON from {full_url}: {body}")
+        })?;
 
         if global.json {
             // Pretty-print so the operator can pipe to `jq`.
