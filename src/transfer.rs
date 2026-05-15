@@ -24,6 +24,7 @@ use sov_modules_api::transaction::{PriorityFeeBips, UnsignedTransaction};
 use sov_modules_api::{CryptoSpec, PrivateKey, Spec};
 
 use crate::cli::GlobalArgs;
+use crate::nonce::fetch_account_nonce;
 use crate::config::{parse_chain_hash, parse_token_id};
 use crate::keystore::{read_address, resolve_signer_key};
 
@@ -207,7 +208,10 @@ impl TransferCmd {
         //
         // - `--nonce N` (required by `--print-tx-bytes`): use the
         //   supplied value. Offline mode, no RPC.
-        // - default: fetch from chain via `Submitter::get_nonce_for_public_key`.
+        // - default: fetch from chain via [`fetch_account_nonce`]
+        //   (queries the chain's uniqueness module directly; the SDK
+        //   fork's `get_nonce_for_public_key` targets the wrong path
+        //   and silently returns 0 on the resulting 404).
         let max_fee = self.max_fee.unwrap_or(DEFAULT_MAX_FEE_NANO);
 
         if self.print_tx_bytes {
@@ -245,9 +249,7 @@ impl TransferCmd {
             .with_context(|| format!("connecting to {rpc}"))?;
         let nonce = match self.nonce {
             Some(n) => n,
-            None => submitter
-                .inner()
-                .get_nonce_for_public_key::<S>(&private_key.pub_key())
+            None => fetch_account_nonce::<S>(&submitter, &private_key.pub_key())
                 .await
                 .with_context(|| format!("fetching nonce for {from_addr}"))?,
         };

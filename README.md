@@ -100,7 +100,7 @@ Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their s
 
 **Pre-devnet.** `ligate-devnet-1` is targeted for **Q2 2026**. Tracking issue: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112).
 
-v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. Only `ligate node start` (operator wrapper around `cargo run --bin ligate-node`) is still deferred.
+v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `sign-attestation`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. Only `ligate node start` (operator wrapper around `cargo run --bin ligate-node`) is still deferred.
 
 First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`. The `Pre-devnet` badge above flips once a 24–48h public soak on Mocha completes; tracking issue [`ligate-cli#21`](https://github.com/ligate-io/ligate-cli/issues/21).
 
@@ -125,7 +125,10 @@ Local Ed25519 keystore management. Files are written to the OS-default data dir 
 ligate keys generate --name alice [--output PATH]
 ligate keys list [--keystore PATH]
 ligate keys show alice [--keystore PATH]
+ligate keys show alice --pubkey [--keystore PATH]   # bech32m lpk1... for register-attestor-set
 ```
+
+`generate` also prints the bech32m `lpk1...` pubkey alongside the `lig1...` address, so registering the role as an attestor right after `keys generate` is a copy-paste away.
 
 The on-disk format matches `ligate-genesis-tool keys generate` from the chain repo. Keystores produced by either tool are interchangeable.
 
@@ -188,6 +191,25 @@ ligate register-schema \
 ```
 
 Schema JSON shape (`name`, `version`, `attestor_set_id`, plus optional `fee_routing_bps` / `fee_routing_address` / `payload_spec_hash`) is documented in the module docstring at [`src/register_schema.rs`](src/register_schema.rs). Returns the `lsc1...` schema id.
+
+### `ligate sign-attestation`
+
+The attestor half of the attestation flow. Produces one entry of the signatures array that `submit-attestation --signatures` consumes. Run on each attestor's machine; the submitter concatenates the outputs into a multi-entry array before submission.
+
+```
+ligate sign-attestation \
+    --schema lsc1...                              \  # registered schema id
+    --payload-hash lph1...                        \  # OR --payload-file <path> to SHA-256 a canonical payload
+    --submitter lig1...                           \  # the address that will run submit-attestation
+    [--timestamp 0]                               \  # default 0 (chain v0 hardcodes timestamp=0)
+    --signer <attestor-role>                      \  # the attestor's keystore role
+    [--output sigs.json]                          \  # write the array form; default stdout
+    [--json]
+```
+
+The chain re-derives the digest at submission time using the same `(schema_id, payload_hash, submitter, timestamp)` tuple. If your inputs here don't match the eventual `submit-attestation`'s `--signer` address, the signature won't verify. The chain's error response now includes the digest it computed and the submitter address it used, so debugging a mismatch is direct.
+
+For the canonical byte layout (and a test vector), see [`docs/protocol/attestation-v0.md`](https://github.com/ligate-io/ligate-chain/blob/main/docs/protocol/attestation-v0.md#signed-payload-for-attestations) §wire-format in the chain repo.
 
 ### `ligate submit-attestation`
 

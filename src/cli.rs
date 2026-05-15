@@ -14,6 +14,7 @@ use crate::keys::KeysCmd;
 use crate::query::QueryCmd;
 use crate::register_attestor_set::RegisterAttestorSetCmd;
 use crate::register_schema::RegisterSchemaCmd;
+use crate::sign_attestation::SignAttestationCmd;
 use crate::submit_attestation::SubmitAttestationCmd;
 use crate::transfer::TransferCmd;
 
@@ -164,6 +165,13 @@ pub enum Command {
     /// Register an attestation schema from a JSON definition file.
     /// Returns the `lsc1...` id.
     RegisterSchema(RegisterSchemaCmd),
+
+    /// Sign the canonical attestation digest with a local attestor
+    /// key. Produces a signature entry consumable by
+    /// `submit-attestation --signatures`. Use this on each attestor's
+    /// machine, then concatenate the outputs to assemble an M-of-N
+    /// signatures file.
+    SignAttestation(SignAttestationCmd),
 
     /// Submit a threshold-signed attestation under an existing schema.
     SubmitAttestation(SubmitAttestationCmd),
