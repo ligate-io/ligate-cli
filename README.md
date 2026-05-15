@@ -283,6 +283,17 @@ cargo clippy --all-targets -- -D warnings
 
 The `cargo test` job is currently disabled in CI because the chain's risc0 prover crate (transitively pulled via `ligate-rollup`) trips its build script under `cargo test` even with `SKIP_GUEST_BUILD=1`. Pure-keystore unit tests live under `mod tests` in `keys.rs` and `config.rs` and run via `cargo check --all-targets`.
 
+### Pre-commit hooks
+
+`.pre-commit-config.yaml` runs `cargo fmt --check` on every commit so formatting drift is caught locally instead of in CI. One-time setup per clone:
+
+```bash
+brew install pre-commit         # or: pip install pre-commit
+pre-commit install              # writes .git/hooks/pre-commit
+```
+
+Skip the hook for an emergency commit with `git commit --no-verify`; the same check still re-runs in CI.
+
 ## Related
 
 - Tracking: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112)
