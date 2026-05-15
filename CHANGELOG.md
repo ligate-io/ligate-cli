@@ -8,7 +8,16 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [0.1.0-devnet] - 2026-05-15
+## [0.1.1-devnet] - 2026-05-15
+
+Patch release. Fixes two URL-doubling bugs in the SDK-mediated HTTP path that surfaced during the `ligate-devnet-1` first-deploy smoke. Same root cause across both:
+
+### Fixed
+
+- `ligate info` failed against the live devnet with `parsing /rollup/info JSON: EOF while parsing a value at line 1 column 0` despite the chain serving the expected JSON. Root cause: `Submitter::inner().http_get(full_url)` triggered the SDK's `NodeClient::http_get` which prepends its own `base_url`, producing a doubled URL (`<base>/rollup/info<base>/rollup/info`) that 404s with an empty body. `http_get` then returned `Ok("")` because the SDK doesn't check status codes. Fix: pass the PATH `/rollup/info` (not the full URL). (#24)
+- `ligate transfer` and `ligate <attestation cmd>` `wait_for_inclusion` polling returned "tx included" on the first poll regardless of whether the tx had actually landed -- same root cause as the `info` bug. The `.is_ok()` check in the poll loop matched `Ok("")` returned by `http_get` for the chain's 404-on-not-yet-indexed response. The tx itself still landed within ~12s (Mocha's block time) but the cli's claim about inclusion was vacuous. Fix: pass the PATH `/ledger/txs/{hash}` and additionally check that the response body is non-empty (empty body = not yet indexed = keep polling; populated body = chain returning the tx JSON = return). (#25)
+
+
 
 First tagged release. Cut alongside `ligate-chain` `v0.1.0-devnet`
 and the `ligate-devnet-1` public devnet rung. Bundles the rc.1

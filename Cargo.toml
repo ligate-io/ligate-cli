@@ -1,6 +1,6 @@
 [package]
 name = "ligate-cli"
-version = "0.1.0-devnet"
+version = "0.1.1-devnet"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 description = "Operator + builder CLI for Ligate Chain. One-line wrapper around the typed client SDK."
