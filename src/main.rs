@@ -12,7 +12,6 @@ mod faucet;
 mod info;
 mod keys;
 mod keystore;
-mod nonce;
 mod query;
 mod register_attestor_set;
 mod register_schema;
