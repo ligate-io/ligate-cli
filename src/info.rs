@@ -66,9 +66,8 @@ impl InfoCmd {
             .http_get("/rollup/info")
             .await
             .with_context(|| format!("GET {full_url}"))?;
-        let info: RollupInfo = serde_json::from_str(&body).with_context(|| {
-            format!("parsing /rollup/info JSON from {full_url}: {body}")
-        })?;
+        let info: RollupInfo = serde_json::from_str(&body)
+            .with_context(|| format!("parsing /rollup/info JSON from {full_url}: {body}"))?;
 
         if global.json {
             // Pretty-print so the operator can pipe to `jq`.
