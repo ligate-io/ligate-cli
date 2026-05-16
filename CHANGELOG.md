@@ -8,6 +8,24 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.2-devnet] - 2026-05-16
+
+Builder-side release. Adds the attestor half of the attestation flow (`sign-attestation`), `keys show --pubkey` for first-party `lpk1...` derivation, and consolidates the nonce-path workaround across `transfer` + attestation verbs onto a single shared helper. Also bumps the SDK fork pin to `eab3f9d0` to align with the chain repo (the upstream `NodeClient::get_nonce_for_public_key` uniqueness-path fix landed; local workaround stays in `src/nonce.rs` until every chain rev the CLI talks to includes the fix).
+
+### Added
+
+- `ligate sign-attestation` subcommand. Builds the canonical SHA-256(borsh(SignedAttestationPayload)) digest via `ligate_client::attestation_digest`, signs with the named keystore role, and prints the entry shape that `submit-attestation --signatures` consumes. Closes the gap where attestor operators had to either use the Rust `ligate-client` crate directly or roll their own ed25519+borsh outside the CLI. Pairs with the matching JS-side helpers in `ligate-js` `v0.1.1-devnet`. (#28)
+- `--payload-file` flag on `sign-attestation`. SHA-256s a canonical payload file as a convenience so attestors don't need a separate hashing step before signing. (#28)
+- `ligate keys show <role> --pubkey`. Prints the `lpk1...` bech32m public key for the given keystore role. Operators registering an attestor set now have a first-party path from "keystore on disk" to "membership entry"; previously had to hand-roll the bech32m encoding. (#28)
+- `ligate keys generate` now echoes the `lpk1...` pubkey alongside the address. Same rationale: keep the bech32m derivation off the operator's plate. `GeneratedKey` gains a `pubkey` field for `--json`-consuming callers. (#28)
+- `examples/derive_digest.rs`. Standalone binary that prints the borsh bytes + digest for the canonical LIP-5 test vector. Lets non-Rust attestor implementations cross-check their own digest computation byte-for-byte against the reference. (#28)
+- `.pre-commit-config.yaml`. Local `cargo fmt --check` gate at commit time, matching the chain repo + api repo patterns. One-time setup: `pre-commit install`. (#30)
+
+### Changed
+
+- Nonce-path workaround consolidated. Both `src/transfer.rs` and the attestation verbs (`register-attestor-set`, `register-schema`, `submit-attestation`) now share `src/nonce.rs::fetch_account_nonce`, which hits the chain's `/modules/uniqueness/...` path directly. Previously only the attestation verbs had the workaround; `transfer` against an account with on-chain nonce > 0 silently sent a tx with nonce 0 and got `Tx bad nonce` from the chain. Tracked upstream in `ligate-io/sovereign-sdk#2`; this helper becomes deletable when every chain rev the CLI talks to includes the upstream fix. (#28)
+- SDK fork pin bumped to `ligate-io/sovereign-sdk@eab3f9d0` (was `49e9b2057`). Picks up the upstream uniqueness-path fix. Stays at the same upstream `Sovereign-Labs/sovereign-sdk` head, just realigns the [patch] table with the chain repo. (#29)
+
 ## [0.1.1-devnet] - 2026-05-15
 
 Patch release. Fixes two URL-doubling bugs in the SDK-mediated HTTP path that surfaced during the `ligate-devnet-1` first-deploy smoke. Same root cause across both:
