@@ -15,7 +15,7 @@ Two paths, in preference order.
 Each tagged release (`v*` tag) attaches platform tarballs for **linux-x86_64**, **linux-arm64**, **darwin-arm64**, **darwin-amd64**, each with a SHA-256 sidecar. Pick the one for your host:
 
 ```bash
-# Replace VERSION with the release tag (e.g. v0.1.0-devnet) and
+# Replace VERSION with the release tag (e.g. v0.1.2-devnet) and
 # PLATFORM with one of: linux-amd64, linux-arm64, darwin-arm64,
 # darwin-amd64.
 curl -L -o ligate.tar.gz \
@@ -47,7 +47,7 @@ SKIP_GUEST_BUILD=1 RISC0_SKIP_BUILD_KERNELS=1 \
 
 The two env vars skip the risc0 zkVM guest compile — the CLI doesn't run real proving (mock zkvm is fine for client-side use). Without them, you'd also need the `risc0` toolchain (`rzup install`).
 
-`crates.io` publish is blocked until the Sovereign SDK lands there (chain pin is a git dep today). Tracked in [ligate-chain#235](https://github.com/ligate-io/ligate-chain/issues/235).
+`crates.io` publish is blocked until the Sovereign SDK lands there (chain pin is a git dep today). Tracked in [ligate-chain#235](https://github.com/ligate-io/ligate-chain/issues/235). `Cargo.toml` also sets `publish = false` so an accidental `cargo publish` is a no-op until both are resolved.
 
 ### Use
 
@@ -100,9 +100,14 @@ Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their s
 
 **Devnet.** `ligate-devnet-1` is live.
 
-v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `sign-attestation`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. Only `ligate node start` (operator wrapper around `cargo run --bin ligate-node`) is still deferred.
+v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `sign-attestation`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. `ligate node start` is not in scope for v0.
 
 First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`.
+Current release: `v0.1.2-devnet` (see [`Cargo.toml`](Cargo.toml) for the live version).
+
+### Versioning
+
+Going forward, releases drop the `-devnet` suffix per the convention adopted in [`ligate-chain#374`](https://github.com/ligate-io/ligate-chain/pull/374). Plain semver tags (`v0.1.x`, `v0.2.x`, ...) for the binary, with network identity carried in `chain_id` and genesis directory names instead of the binary tag. Past `-devnet` tags stay as archaeology. The next CLI cut (`v0.1.3` or higher) will be the first to land on the new scheme alongside `ligate-chain` `v0.1.3`.
 
 ## Commands
 
@@ -119,7 +124,7 @@ Useful first command in the post-`ligate-node-up` smoke test from [`docs/develop
 
 ### `ligate keys`
 
-Local Ed25519 keystore management. Files are written to the OS-default data dir (`~/Library/Application Support/io.ligate.cli/keys` on macOS, `$XDG_DATA_HOME/ligate/keys` on Linux), with `<role>.key` (mode `0600`) and `<role>.address` plaintext.
+Local Ed25519 keystore management. Files are written to the OS-default data dir (`~/Library/Application Support/io.ligate.cli/keys` on macOS, `$XDG_DATA_HOME/cli/keys` on Linux; the `directories` crate uses the last `ProjectDirs::from` component as the leaf), with `<role>.key` (mode `0600`) and `<role>.address` plaintext.
 
 ```
 ligate keys generate --name alice [--output PATH]
@@ -190,7 +195,7 @@ ligate register-schema \
     --chain-id <u64> --chain-hash <64-hex>
 ```
 
-Schema JSON shape (`name`, `version`, `attestor_set_id`, plus optional `fee_routing_bps` / `fee_routing_address` / `payload_spec_hash`) is documented in the module docstring at [`src/register_schema.rs`](src/register_schema.rs). Returns the `lsc1...` schema id.
+Schema JSON shape (`name`, `version`, `attestor_set_id`, plus optional `fee_routing_bps` / `fee_routing_addr` / `payload_shape_hash`) is documented in the module docstring at [`src/register_schema.rs`](src/register_schema.rs). Returns the `lsc1...` schema id.
 
 ### `ligate sign-attestation`
 
