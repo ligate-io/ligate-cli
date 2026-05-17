@@ -6,7 +6,7 @@
 //!
 //! - `query schema <lsc1...>` -> `GET /modules/attestation/schemas/{id}`
 //! - `query attestor-set <las1...>` -> `GET /modules/attestation/attestor-sets/{id}`
-//! - `query attestation <lsc1...:lph1...>` -> `GET /modules/attestation/attestations/{id}`
+//! - `query attestation <lat1...>` -> `GET /modules/attestation/attestations/{id}`
 //!
 //! Each id is validated client-side before the request so an obvious
 //! typo fails fast without a network round-trip. The chain's typed
@@ -35,9 +35,9 @@ pub enum QueryCmd {
         id: String,
     },
 
-    /// Fetch an attestation by its `<lsc1...>:<lph1...>` compound id.
+    /// Fetch an attestation by its bech32m `lat1...` id.
     Attestation {
-        /// Compound `<schemaId>:<payloadHash>` attestation id.
+        /// Bech32m `lat1...` attestation id (32-byte hash of schema_id || payload_hash).
         id: String,
     },
 }

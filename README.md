@@ -238,7 +238,7 @@ Read-only fetch by id; no signing or keystore touch. Mirrors the three `/v1/...`
 ```
 ligate query schema lsc1...                   # registered schema
 ligate query attestor-set las1...             # registered attestor set
-ligate query attestation lsc1...:lph1...      # attestation (compound id)
+ligate query attestation lat1...              # attestation (single bech32m id)
 ```
 
 ## Global flags
