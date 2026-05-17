@@ -15,7 +15,7 @@ Two paths, in preference order.
 Each tagged release (`v*` tag) attaches platform tarballs for **linux-x86_64**, **linux-arm64**, **darwin-arm64**, **darwin-amd64**, each with a SHA-256 sidecar. Pick the one for your host:
 
 ```bash
-# Replace VERSION with the release tag (e.g. v0.1.2-devnet) and
+# Replace VERSION with the release tag (e.g. v0.1.3) and
 # PLATFORM with one of: linux-amd64, linux-arm64, darwin-arm64,
 # darwin-amd64.
 curl -L -o ligate.tar.gz \
@@ -103,7 +103,7 @@ Then `ligate <TAB>` discovers subcommands; `ligate keys <TAB>` discovers their s
 v0 surface (`info`, `keys`, `balance`, `transfer`, `faucet`, `register-attestor-set`, `register-schema`, `sign-attestation`, `submit-attestation`, `query`, `completions`) is wired and CI-green against `ligate-chain` `main`. `ligate node start` is not in scope for v0.
 
 First tagged release is [`v0.1.0-devnet`](https://github.com/ligate-io/ligate-cli/releases/tag/v0.1.0-devnet) — cut alongside `ligate-chain` `v0.1.0-devnet`.
-Current release: `v0.1.2-devnet` (see [`Cargo.toml`](Cargo.toml) for the live version).
+Current release: `v0.1.3` (see [`Cargo.toml`](Cargo.toml) for the live version).
 
 ### Versioning
 
@@ -163,11 +163,11 @@ ligate transfer \
 
 ### `ligate faucet`
 
-Claim a drip from a deployed faucet service.
+Claim a drip from the public devnet faucet. Defaults to `https://api.ligate.io/v1/drip`; override for a self-hosted instance.
 
 ```
 ligate faucet lig1xyz...
-ligate faucet lig1xyz... --faucet-url https://faucet.ligate.io
+ligate faucet lig1xyz... --faucet-url https://api.ligate.io/v1/drip
 ```
 
 ### `ligate register-attestor-set`
@@ -268,13 +268,13 @@ flowchart LR
     Faucet -->|"drip tx"| Node
 ```
 
-`keys generate` lifts the chain genesis-tool's keystore logic byte-for-byte. `transfer` mirrors the faucet's signer pipeline (one-shot per invocation, fetches nonce from chain). `balance` is a pure read against `NodeClient::get_balance_for_holder`. `faucet` is just an HTTP client to a deployed faucet's `POST /faucet`.
+`keys generate` lifts the chain genesis-tool's keystore logic byte-for-byte. `transfer` mirrors the faucet's signer pipeline (one-shot per invocation, fetches nonce from chain). `balance` is a pure read against `NodeClient::get_balance_for_holder`. `faucet` is just an HTTP client to the unified API's `POST /v1/drip` endpoint.
 
 ## Why a separate repo
 
 - Different release cadence (operator-driven, faster than chain releases).
 - Different scaling concerns (zero, it's a CLI tool with a stable v0 surface).
-- Same pattern as `ligate-explorer`, `ligate-faucet`.
+- Same pattern as `ligate-explorer`.
 - Versioned via crates.io once mature; pre-1.0 distributed as `cargo install --git ...`.
 
 ## Development
@@ -303,7 +303,7 @@ Skip the hook for an emergency commit with `git commit --no-verify`; the same ch
 
 - Tracking: [`ligate-chain#112`](https://github.com/ligate-io/ligate-chain/issues/112)
 - Chain SDK: [`ligate-io/ligate-chain/crates/client-rs`](https://github.com/ligate-io/ligate-chain/tree/main/crates/client-rs)
-- Faucet: [`ligate-io/faucet`](https://github.com/ligate-io/faucet)
+- Drip endpoint: [`ligate-io/ligate-api`](https://github.com/ligate-io/ligate-api) (`POST /v1/drip`)
 - Genesis-tool keys: [`ligate-io/ligate-chain/crates/genesis-tool`](https://github.com/ligate-io/ligate-chain/tree/main/crates/genesis-tool)
 
 ## License

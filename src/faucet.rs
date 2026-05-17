@@ -1,14 +1,14 @@
 //! `ligate faucet` subcommand: claim a one-shot drip from the public
 //! devnet faucet.
 //!
-//! Talks to the `ligate-io/faucet` HTTP service over its `POST /faucet`
+//! Talks to the unified `ligate-api` HTTP service over its `POST /v1/drip`
 //! endpoint. Useful as a one-line bootstrap for new users who just
 //! generated a key and need `$LGT` to pay fees on their first
 //! transaction.
 //!
 //! No keystore involvement: the faucet drips to the address regardless
 //! of whether the requester holds the private key. The CLI just
-//! wraps the curl pattern documented in the faucet README.
+//! wraps the curl pattern documented in the ligate-api README.
 
 use anyhow::{Context, Result};
 use clap::Args;
@@ -16,16 +16,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::cli::GlobalArgs;
 
-/// Default faucet base URL. Switch via `--faucet-url` for a self-hosted
+/// Default drip endpoint. Switch via `--faucet-url` for a self-hosted
 /// instance.
-const DEFAULT_FAUCET_URL: &str = "https://faucet.ligate.io";
+const DEFAULT_FAUCET_URL: &str = "https://api.ligate.io/v1/drip";
 
 #[derive(Debug, Args)]
 pub struct FaucetCmd {
     /// `lig1...` recipient address.
     pub address: String,
 
-    /// Override the faucet base URL.
+    /// Override the drip endpoint URL.
     #[arg(long, env = "LIGATE_FAUCET_URL", default_value = DEFAULT_FAUCET_URL)]
     pub faucet_url: String,
 }
@@ -51,7 +51,7 @@ struct FaucetError {
 
 impl FaucetCmd {
     pub async fn run(self, global: &GlobalArgs) -> Result<()> {
-        let url = format!("{}/faucet", self.faucet_url.trim_end_matches('/'));
+        let url = self.faucet_url.trim_end_matches('/').to_string();
 
         let client = reqwest::Client::new();
         let resp = client
