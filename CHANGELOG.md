@@ -8,6 +8,19 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-05-17
+
+Patch release. Fixes `ligate faucet` against the live devnet, and adopts the project-wide clean-semver convention (drops the `-devnet` suffix; network identity now lives in `chain_id` / genesis dir names, not in the binary tag).
+
+### Fixed
+
+- `ligate faucet` was broken in `v0.1.2-devnet` against `ligate-devnet-1`. The hardcoded default URL `https://faucet.ligate.io` no longer resolves (the standalone `ligate-io/faucet` repo was archived; drip moved into `ligate-api` as `POST /v1/drip`), and the URL builder hardcoded a `/faucet` suffix so `--faucet-url` couldn't paper over the host change on its own. Repoints `DEFAULT_FAUCET_URL` at `https://api.ligate.io/v1/drip` and drops the `/faucet` suffix so the configured URL is POSTed directly. Response shape (`{address, tx_hash, amount_nano, drip_amount_lgt}`) is unchanged. (#34)
+
+### Changed
+
+- Version tag drops the `-devnet` suffix. Matches `ligate-chain` `v0.1.2`, `ligate-js`, and `ligate-api`. Past `-devnet` tags stay as archaeology; future releases use plain `vMAJOR.MINOR.PATCH`. Network identity stays in `chain_id` (`ligate-devnet-1`) and genesis dir names.
+- Drops the stale `ligate-faucet` repo pattern reference in `README.md`. Updates the "Related" link to point at `ligate-api` (the new home of `POST /v1/drip`).
+
 ## [0.1.2-devnet] - 2026-05-16
 
 Builder-side release. Adds the attestor half of the attestation flow (`sign-attestation`), `keys show --pubkey` for first-party `lpk1...` derivation, and consolidates the nonce-path workaround across `transfer` + attestation verbs onto a single shared helper. Also bumps the SDK fork pin to `eab3f9d0` to align with the chain repo (the upstream `NodeClient::get_nonce_for_public_key` uniqueness-path fix landed; local workaround stays in `src/nonce.rs` until every chain rev the CLI talks to includes the fix).
