@@ -8,6 +8,24 @@ Format follows [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-17
+
+Breaking release tracking [`ligate-chain#381`](https://github.com/ligate-io/ligate-chain/pull/381). Wire-format change: `AttestationId` collapses from the compound `<schema_id>:<payload_hash>` (`lsc1...:lph1...`) form to a single 32-byte bech32m id with the `lat` HRP (`lat1...`), derived as `SHA-256(schema_id_bytes ‖ payload_hash_bytes)`. The CLI's surface area on attestation ids was small: no in-CLI colon-split parsing existed (parsing is chain-side via `AttestationId::from_str`), and no manual `{schema_id}:{payload_hash}` formatting was in use (display goes through chain `Display`). So this release is mostly docs + a coordinated version bump.
+
+### Changed
+
+- `ligate query attestation <id>` now expects a single `lat1...` bech32m id instead of a compound `<lsc1...>:<lph1...>` pair. Parsing is unchanged on the CLI side: `AttestationId::from_str` is delegated to the chain crate, which switches form once the chain pin is bumped to a post-#381 revision. Updates the subcommand help text + module doc to match.
+- `ligate submit-attestation` receipt format is unchanged at the call site (uses `AttestationId::from_pair` + `Display`); the printed `attestation_id` field automatically switches from compound to `lat1...` once the chain pin is bumped. Inline comment in `src/submit_attestation.rs` refreshed.
+- `README.md` `ligate query attestation` example updated to the single-id form.
+
+### Versioning note
+
+CLI bumps to `0.2.0` (not `0.1.4`) to mirror the chain's minor-version bump for the same wire-format change. The `0.1.x` series tracks pre-#381 chain runs; `0.2.x` tracks post-#381.
+
+### Merge order
+
+This PR is forward-compatible against current chain `main`: code changes are doc/version only, and the runtime parser/display follow whichever chain rev `Cargo.lock` resolves. **Before merging this PR**, bump the chain pin via `cargo update -p ligate-client -p ligate-stf -p ligate-rollup` to pull a chain commit that contains #381. Otherwise the published `v0.2.0` binary will document `lat1...` but its linked chain crate will still parse/print the compound form, breaking the docs.
+
 ## [0.1.3] - 2026-05-17
 
 Patch release. Fixes `ligate faucet` against the live devnet, and adopts the project-wide clean-semver convention (drops the `-devnet` suffix; network identity now lives in `chain_id` / genesis dir names, not in the binary tag).

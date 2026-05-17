@@ -132,8 +132,9 @@ impl SubmitAttestationCmd {
 
         let tx_hash = build_sign_submit(global, &self.chain, &private_key, call).await?;
 
-        // The receipt id is the `<schemaId>:<payloadHash>` compound;
-        // it's what `ligate query attestation` takes.
+        // The receipt id is a single `lat1...` bech32m hash
+        // (SHA-256 of schema_id || payload_hash); it's what
+        // `ligate query attestation` takes.
         let attestation_id = AttestationId::from_pair(&schema_id, &payload_hash);
 
         if global.json {
